@@ -176,7 +176,6 @@ export class ParticipacionController {
           esMejorClasificacion,
           puntosExtra 
         } = puntaje;
-        console.log(puntaje);
 
         const participacion = await Participacion.findByPk(id);
   
@@ -271,6 +270,164 @@ export class ParticipacionController {
       res.status(500).json({ error: 'Error al obtener las participaciones' });
     }
   };
+  
+  static mostrarTablaGeneral = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { anio } = req.params; // Para filtrar por año
+
+      // Obtener todas las participaciones de torneos Copa CARPO del año
+      const participaciones = await Participacion.findAll({
+        include: [
+          {
+            model: Torneo,
+            where: { 
+              esCopaCARPO: true,
+              anio: parseInt(anio)
+            },
+            attributes: ['id', 'nombre']
+          },
+          {
+            model: Arquero,
+            attributes: ['id', 'nombre', 'apellido']
+          }
+        ],
+        attributes: ['arqueroId', 'puntosTotal']
+      });
+
+      // Agrupar por arquero y sumar puntos
+      const tablaAgrupada: any = {};
+
+      participaciones.forEach((p: any) => {
+        const arqueroId = p.arqueroId;
+
+        if (!tablaAgrupada[arqueroId]) {
+          tablaAgrupada[arqueroId] = {
+            arqueroId: arqueroId,
+            arquero: `${p.arquero.nombre} ${p.arquero.apellido}`,
+            puntosTotal: 0,
+            torneosParticipados: 0
+          };
+        }
+
+        tablaAgrupada[arqueroId].puntosTotal += p.puntosTotal;
+        tablaAgrupada[arqueroId].torneosParticipados += 1;
+      });
+
+      // Convertir a array y ordenar por puntos (descendente)
+      const tablaGeneral = Object.values(tablaAgrupada)
+        .sort((a: any, b: any) => b.puntosTotal - a.puntosTotal)
+        .map((arquero: any, index: number) => ({
+          posicion: index + 1,
+          ...arquero
+        }));
+
+      res.status(200).json({
+        anio: parseInt(anio),
+        total: tablaGeneral.length,
+        tablaGeneral
+      });
+
+    } catch (error) {
+      console.error('Error al obtener la tabla general:', error);
+      res.status(500).json({ error: 'Error al obtener la tabla general' });
+    }
+  };
+
+  static mostrarTablaPorCategoria = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { anio, tipoArco } = req.params;
+      const { sexo } = req.query; // Filtro opcional por query param
+
+      // Construir el where dinámico
+      const whereParticipacion: any = { tipoArco };
+      if (sexo) {
+        whereParticipacion.sexo = sexo;
+      }
+
+      // Obtener todas las participaciones filtradas
+      const participaciones = await Participacion.findAll({
+        where: whereParticipacion,
+        include: [
+          {
+            model: Torneo,
+            where: { 
+              esCopaCARPO: true,
+              anio: parseInt(anio)
+            },
+            attributes: ['id', 'nombre']
+          },
+          {
+            model: Arquero,
+            attributes: ['id', 'nombre', 'apellido', 'sexo']
+          },
+          {
+            model: CategoriaModalidad,
+            as: 'categoriaEspecifica',
+            attributes: ['categoriaGeneral']
+          }
+        ],
+        attributes: ['arqueroId', 'puntosTotal', 'sexo']
+      });
+
+      // Separar por categoría general (SENIOR y ESCUELA)
+      const tablasSeparadas: any = {
+        SENIOR: {},
+        ESCUELA: {}
+      };
+
+      participaciones.forEach((p: any) => {
+        const categoriaGeneral = p.categoriaEspecifica.categoriaGeneral;
+        const arqueroId = p.arqueroId;
+
+        if (!tablasSeparadas[categoriaGeneral][arqueroId]) {
+          tablasSeparadas[categoriaGeneral][arqueroId] = {
+            arqueroId: arqueroId,
+            arquero: `${p.arquero.nombre} ${p.arquero.apellido}`,
+            sexo: p.arquero.sexo,
+            puntosTotal: 0,
+            torneosParticipados: 0
+          };
+        }
+
+        tablasSeparadas[categoriaGeneral][arqueroId].puntosTotal += p.puntosTotal;
+        tablasSeparadas[categoriaGeneral][arqueroId].torneosParticipados += 1;
+      });
+
+      // Convertir a arrays y ordenar
+      const tablaSenior = Object.values(tablasSeparadas.SENIOR)
+        .sort((a: any, b: any) => b.puntosTotal - a.puntosTotal)
+        .map((arquero: any, index: number) => ({
+          posicion: index + 1,
+          ...arquero
+        }));
+
+      const tablaEscuela = Object.values(tablasSeparadas.ESCUELA)
+        .sort((a: any, b: any) => b.puntosTotal - a.puntosTotal)
+        .map((arquero: any, index: number) => ({
+          posicion: index + 1,
+          ...arquero
+        }));
+
+      res.status(200).json({
+        anio: parseInt(anio),
+        tipoArco,
+        filtroSexo: sexo || 'Todos',
+        senior: {
+          total: tablaSenior.length,
+          ranking: tablaSenior
+        },
+        escuela: {
+          total: tablaEscuela.length,
+          ranking: tablaEscuela
+        }
+      });
+
+    } catch (error) {
+      console.error('Error al obtener tabla por categoría:', error);
+      res.status(500).json({ error: 'Error al obtener la tabla por categoría' });
+    }
+  };
+
 }
 
 

@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import { body, param } from 'express-validator';
+import { body, param, query } from 'express-validator';
 import { handleInputErrors } from '../middlewares/validation';
 import { authenticate } from '../middlewares/auth';
 import { authorize } from '../middlewares/roles';
 import { ParticipacionController } from '../controllers/participacionController';
-import { Rol } from '../models/Arquero';
+import { Rol, Sexo, TipoArco } from '../models/Arquero';
 import { Medalla } from '../models/Participacion';
 
 const router = Router();
@@ -25,6 +25,29 @@ router.get('/arquero/:arqueroId',
   ParticipacionController.obtenerParticipacionesPorArquero
 );
 
+// Tabla general de la Copa CARPO por año
+router.get('/tabla-general/:anio',
+  param('anio')
+    .isInt({ min: 2000, max: 2100 })
+    .withMessage('Año no válido'),
+  handleInputErrors,
+  ParticipacionController.mostrarTablaGeneral
+);
+
+router.get('/tabla-categoria/:anio/:tipoArco',
+  param('anio')
+    .isInt({ min: 2000, max: 2100 })
+    .withMessage('Año no válido'),
+  param('tipoArco')
+    .isIn(Object.values(TipoArco))
+    .withMessage('Tipo de arco no válido'),
+  query('sexo')
+    .optional()
+    .isIn(Object.values(Sexo))
+    .withMessage('Sexo no válido'),
+  handleInputErrors,
+  ParticipacionController.mostrarTablaPorCategoria
+);
 // ==================== RUTAS PROTEGIDAS (USUARIO LOGUEADO) ====================
 
 // Inscribir arquero a un torneo
