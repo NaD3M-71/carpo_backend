@@ -48,6 +48,7 @@ router.get('/tabla-categoria/:anio/:tipoArco',
   handleInputErrors,
   ParticipacionController.mostrarTablaPorCategoria
 );
+
 // ==================== RUTAS PROTEGIDAS (USUARIO LOGUEADO) ====================
 
 // Inscribir arquero a un torneo

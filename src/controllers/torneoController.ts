@@ -3,6 +3,7 @@ import { Arquero } from '../models/Arquero';
 import bcrypt from 'bcrypt';
 import { generateToken } from '../utils/jwt';
 import { Torneo } from '../models/Torneo';
+import { CategoriaModalidad } from '../models/CategoriaModalidad';
 
 export class TorneoController {
 
@@ -161,4 +162,19 @@ export class TorneoController {
       res.status(500).json({ error: 'Error al eliminar el torneo' });
     }
   };
+
+  static getCategoriasEspecificasTorneo = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { modalidad } = req.params;
+
+      // Lógica para obtener las categorías específicas según la modalidad
+      const categoriasEspecificas = await CategoriaModalidad.findAll({
+        where: { modalidad }
+      });
+      res.status(200).json({ categoriasEspecificas });
+    } catch (error) {
+      console.error('Error al obtener categorías específicas:', error);
+      res.status(500).json({ error: 'Error al obtener las categorías específicas' });
+    }
+  }
 }

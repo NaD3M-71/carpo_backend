@@ -11,9 +11,11 @@ import { ModalidadTorneo } from "../models/Torneo";
 const router = Router();
 
 // READ
+
 router.get('/', 
   TorneoController.getAllTorneos
 );
+
 router.get('/:id',
   param('id').isInt().withMessage('ID no válido'),
   handleInputErrors,
@@ -21,19 +23,27 @@ router.get('/:id',
 );
 router.get('/anio/:anio',
   param('anio')
-    .isInt({ min: 2000, max: 2100 })
-    .withMessage('Año no válido'),
+  .isInt({ min: 2000, max: 2100 })
+  .withMessage('Año no válido'),
   handleInputErrors,
   TorneoController.getTorneosByAnio
 );
 router.get('/copa-carpo/:anio',
   param('anio')
-    .isInt({ min: 2000, max: 2100 })
-    .withMessage('Año no válido'),
+  .isInt({ min: 2000, max: 2100 })
+  .withMessage('Año no válido'),
   handleInputErrors,
   TorneoController.getTorneosCopaCARPO
 );
 
+// Get de categorias específicas para un torneo
+router.get('/categorias/:modalidad',
+  param('modalidad')
+    .isIn(['3D', 'SALA', 'CAMPO', 'MULTITARGET', 'AIRE_LIBRE'])
+    .withMessage('Modalidad no válida'),
+  handleInputErrors,
+  TorneoController.getCategoriasEspecificasTorneo
+);
 // crear torneo
 router.post("/create",
   authenticate,
@@ -108,6 +118,7 @@ router.delete('/:id',
   handleInputErrors,
   TorneoController.deleteTorneo
 );
+
 
 
 
