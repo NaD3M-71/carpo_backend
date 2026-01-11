@@ -14,6 +14,7 @@ export const db = new Sequelize(
   process.env.DB_PASSWORD ,        // contraseña de MySQL
   {
     host: process.env.DB_HOST || 'localhost',
+    port: Number(process.env.DB_PORT) || 3306,
     dialect: 'mysql',
     logging: false,
     models: [Arquero,Torneo, CategoriaModalidad,Participacion]                 // pone true si querés ver las consultas SQL en consola
