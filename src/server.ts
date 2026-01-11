@@ -35,6 +35,9 @@ app.use(
 app.use(morgan('dev'))
 
 app.use(express.json())
+app.get('/', (req, res) => {
+  res.json({ ok: true });
+});
 
 //rutas
 app.use('/api/arqueros', authRouter)
