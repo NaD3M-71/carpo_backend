@@ -39,7 +39,7 @@ router.get('/copa-carpo/:anio',
 // Get de categorias específicas para un torneo
 router.get('/categorias/:modalidad',
   param('modalidad')
-    .isIn(['3D', 'SALA', 'CAMPO', 'MULTITARGET', 'AIRE_LIBRE'])
+    .isIn(['3D', 'SALA', 'CAMPO', 'MULTI_TARGET', 'AIRE_LIBRE'])
     .withMessage('Modalidad no válida'),
   handleInputErrors,
   TorneoController.getCategoriasEspecificasTorneo
