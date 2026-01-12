@@ -53,7 +53,7 @@ router.post("/create",
     .isLength({max: 100}).withMessage("El nombre del torneo es demasiado largo"),
   body('modalidad')
   .notEmpty().withMessage("La modalidad del torneo es obligatoria")
-  .isIn(['3D',"SALA","CAMPO","MULTITARGET","AIRE_LIBRE"]).withMessage("Modalidad no válida"),
+  .isIn(['3D',"SALA","CAMPO","MULTI_TARGET","AIRE_LIBRE"]).withMessage("Modalidad no válida"),
   body('fechaInicio')
     .notEmpty().withMessage("La fecha de inicio es obligatoria")
     .isISO8601().toDate().withMessage("Fecha de inicio no válida"),
