@@ -90,10 +90,10 @@ export class ParticipacionController {
       }
 
       // No permitir desinscripción si el torneo ya finalizó o está cancelado
-      if (torneo.estado === EstadoTorneo.CERRADO ) {
-        res.status(400).json({ error: 'No se puede desinscribir de un torneo finalizado o cancelado' });
-        return;
-      }
+      // if (torneo.estado === EstadoTorneo.CERRADO ) {
+      //   res.status(400).json({ error: 'No se puede desinscribir de un torneo finalizado o cancelado' });
+      //   return;
+      // } TODO: solo pueden desinscribir los admins en caso que de que el arquero no haya asistido
 
       // Buscar la participación
       const participacion = await Participacion.findOne({
