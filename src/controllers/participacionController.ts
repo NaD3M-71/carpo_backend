@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { Participacion, Medalla } from '../models/Participacion';
-import { Arquero } from '../models/Arquero';
+import { Arquero, TipoArco } from '../models/Arquero';
 import { Torneo, EstadoTorneo } from '../models/Torneo';
 import { CategoriaModalidad } from '../models/CategoriaModalidad';
 import { AuthRequest } from '../types';
@@ -288,7 +288,7 @@ export class ParticipacionController {
           },
           {
             model: Arquero,
-            attributes: ['id', 'nombre', 'apellido']
+            attributes: ['id', 'nombre', 'apellido','tipoArco', 'categoriaGeneral', 'sexo']
           }
         ],
         attributes: ['arqueroId', 'puntosTotal']
@@ -304,6 +304,9 @@ export class ParticipacionController {
           tablaAgrupada[arqueroId] = {
             arqueroId: arqueroId,
             arquero: `${p.arquero.nombre} ${p.arquero.apellido}`,
+            TipoArco: p.arquero.tipoArco,
+            categoria: p.arquero.categoriaGeneral,
+            sexo: p.arquero.sexo,
             puntosTotal: 0,
             torneosParticipados: 0
           };
