@@ -2,12 +2,15 @@ import express from 'express'
 import morgan from 'morgan'
 import { db } from './config/db'
 import cors from 'cors'
+import cookieParser from 'cookie-parser'
 
 
 //rutas
 import authRouter from './routes/arqueros'
 import torneoRouter from './routes/torneos'
 import participacionRouter from './routes/participaciones'
+import galeriaRouter from './routes/galerias'
+import commonRoutes from './routes/routes'
 import { sembrarCategorias } from './seeders/CategoriaModalidadSeeder'
 
 async function connectDB(){
@@ -33,6 +36,7 @@ app.use(
   })
 )
 app.use(morgan('dev'))
+app.use(cookieParser())
 
 app.use(express.json())
 app.get('/', (req, res) => {
@@ -43,5 +47,7 @@ app.get('/', (req, res) => {
 app.use('/api/arqueros', authRouter)
 app.use('/api/torneos', torneoRouter)
 app.use('/api/participaciones', participacionRouter)
+app.use('/api/galerias', galeriaRouter)
+app.use('/', commonRoutes)
 
 export default app

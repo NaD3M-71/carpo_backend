@@ -1,7 +1,11 @@
 import { Request, Response } from 'express';
 import { Arquero } from '../models/Arquero';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
+import { Op } from 'sequelize';
 import { generateToken } from '../utils/jwt';
+import { sendResetPasswordMail } from '../utils/sendResetPasswordMail';
+import { AuthRequest } from '../types';
 
 export class ArqueroController {
   //CREATE
@@ -187,7 +191,7 @@ export class ArqueroController {
       }
 
       // Verificar si el arquero está activo
-      if (!arquero.nombre) {
+      if (!arquero.isActive) {
         res.status(403).json({ error: 'Cuenta desactivada. Contacta al administrador' });
         return;
       }
@@ -208,11 +212,16 @@ export class ArqueroController {
       });
 
       // Responder con el token y datos del usuario (sin password)
-      const { password: _, ...arqueroSinPassword } = arquero.toJSON();
+
+      res.cookie('token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 1000 * 60 * 60 * 24 * 3 // 3 días
+      });
 
       res.status(200).json({
         message: 'Login exitoso',
-        token,
         //arquero: arqueroSinPassword
          usuario: {
           id: arquero.id,
@@ -227,6 +236,36 @@ export class ArqueroController {
       res.status(500).json({ error: 'Error al iniciar sesión' });
     }
   };
+
+  // Usuario autenticado
+static me = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      res.status(401).json({ error: 'No autenticado' });
+      return;
+    }
+
+    const arquero = await Arquero.findByPk(req.user.id);
+
+    if (!arquero) {
+      res.status(404).json({ error: 'Usuario no encontrado' });
+      return;
+    }
+
+    res.status(200).json({
+      id: arquero.id,
+      nombre: arquero.nombre,
+      email: arquero.email,
+      rol: arquero.rol,
+      tipoArco: arquero.tipoArco,
+      sexo: arquero.sexo
+    });
+
+  } catch (error) {
+    console.error('Error en /me:', error);
+    res.status(500).json({ error: 'Error al obtener usuario' });
+  }
+};
 
   // Logout
   static logout = async (_req: Request, res: Response): Promise<void> => {
@@ -245,7 +284,93 @@ export class ArqueroController {
       res.status(500).json({ error: 'Error al cerrar sesión' })
     }
   }
-}
+
+  // recuperar contraseña
+  static recuperarPassword = async (req: Request, res: Response)=>{
+    try {
+      const { email } = req.body as { email?: string };
+      if (!email) {
+        return res.status(400).json({ message: 'Email requerido' });
+      }
+
+      const arquero = await Arquero.findOne({ where: {email}});
+      if (!arquero) {
+        return res.status(200).json({ message: `Si el email "${email}" existe, recibiras las instrucciones por ese medio para recuperar tu contraseña` });
+      }
+
+      // generar token
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const hashedToken = crypto
+        .createHash('sha256')
+        .update(resetToken)
+        .digest('hex');
+
+      // expiracion del token
+      const tokenExpiration = new Date(Date.now() + 1000 * 60 * 60); // 1 hora
+
+      // guardar token en la bd
+      arquero.token = hashedToken;
+      arquero.tokenExpiration = tokenExpiration;
+      await arquero.save();
+
+      // link de recuperacion
+      const resetLink = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+
+      try {
+        await sendResetPasswordMail({
+          to: arquero.email,
+          resetLink,
+        });
+      } catch (mailError) {
+        console.error('Error enviando mail:', mailError);
+        // opcional: limpiar token si falla el mail
+        arquero.token = null;
+        arquero.tokenExpiration = null;
+        await arquero.save();
+      }
+
+      res.status(200).json({ message: `Si el email "${email}" existe, recibiras las instrucciones por ese medio para recuperar tu contraseña` });
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ message: 'Error interno del servidor' });
+    }
+  }
+
+  // restablecer contraseña
+  static restablecerPassword = async (req: Request, res: Response)=>{
+    try {
+      const { token } = req.params as { token?: string };
+      const hashedToken = crypto
+        .createHash('sha256')
+        .update(token)
+        .digest('hex');
+      const { newPassword} = req.body as {  newPassword?: string };
+      if (!token || !newPassword) {
+        return res.status(400).json({ message: 'Token y nueva contraseña son requeridos' });
+      }
+
+      const arquero = await Arquero.findOne({
+        where: {
+          token: hashedToken,
+          tokenExpiration: { [Op.gt]: new Date() }
+        }
+      });
+      if (!arquero) {
+        return res.status(400).json({ message: 'Token inválsido o expirado' });
+      }
+
+      arquero.password = await bcrypt.hash(newPassword, 10);
+      arquero.token = null;
+      arquero.tokenExpiration = null;
+      await arquero.save();
+      res.status(200).json({ message: 'Contraseña restablecida exitosamente' });
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({ message: 'Error interno del servidor' });
+    }
+  }
+
+}  
 
 
 

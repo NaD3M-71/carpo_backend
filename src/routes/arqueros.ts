@@ -3,8 +3,6 @@ import { handleInputErrors } from "../middlewares/validation";
 import { body, param } from "express-validator";
 import { ArqueroController } from "../controllers/arqueroController";
 import { authenticate } from "../middlewares/auth";
-import { authorize } from "../middlewares/roles";
-import { Rol } from "../models/Arquero";
 
 const router = Router();
 
@@ -14,6 +12,14 @@ const router = Router();
 router.get("/", 
   ArqueroController.getAll
 );
+// identificar al usuario logueado
+router.get(
+  '/me',
+  authenticate,
+  ArqueroController.me
+);
+
+
 router.get("/:id", 
   param('id')
     .isInt().withMessage('ID no válido'),
@@ -97,7 +103,7 @@ router.put('/:id',
   
   body('tipoArco')
     .optional()
-    .isIn(['RECURVO', 'COMPUESTO', 'LONGBOW', 'TRADICIONAL'])
+    .isIn(['RECURVO', 'COMPUESTO', 'LONGBOW', 'TRADICIONAL', 'RASO'])
     .withMessage('Tipo de arco no válido'),
   
   body('lateralidad')
@@ -162,7 +168,31 @@ router.post('/login',
   ArqueroController.login
 );
 
+
+
+
 // Logout
 router.post('/logout', ArqueroController.logout)
+
+// recuperar contraseña
+router.post('/recuperar-password', 
+  body('email')
+    .notEmpty().withMessage('El email es obligatorio')
+    .isEmail().withMessage('Email no válido'),
+  handleInputErrors,
+  ArqueroController.recuperarPassword)
+
+// restablecer contraseña
+router.post('/restablecer-password/:token',
+  param('token')
+    .notEmpty().withMessage('El token es obligatorio'),
+  body('newPassword')
+    .notEmpty().withMessage('La nueva contraseña es obligatoria')
+    .isLength({ min: 6 }).withMessage('La nueva contraseña debe tener al menos 6 caracteres'),
+  handleInputErrors,
+  ArqueroController.restablecerPassword
+)
+
+
 
 export default router;

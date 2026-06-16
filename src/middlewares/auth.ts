@@ -9,7 +9,7 @@ export const authenticate = (
 ): void => {
   try {
     // Obtener el token del header Authorization
-    const token = req.headers.authorization?.split(' ')[1]; // Bearer TOKEN
+    const token = req.cookies.token
 
     if (!token) {
       res.status(401).json({ error: 'Token no proporcionado' });

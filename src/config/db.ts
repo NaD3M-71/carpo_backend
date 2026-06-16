@@ -5,6 +5,7 @@ import { Arquero } from '../models/Arquero';
 import { Torneo } from '../models/Torneo';
 import { CategoriaModalidad } from '../models/CategoriaModalidad';
 import { Participacion } from '../models/Participacion';
+import { Galeria } from '../models/Galeria';
 dotenv.config();
 
 // Creamos la instancia de conexión a la BD
@@ -17,7 +18,7 @@ export const db = new Sequelize(
     port: Number(process.env.DB_PORT) || 3306,
     dialect: 'mysql',
     logging: false,
-    models: [Arquero,Torneo, CategoriaModalidad,Participacion]                 // pone true si querés ver las consultas SQL en consola
+    models: [Arquero, Torneo, CategoriaModalidad, Participacion, Galeria]                 // pone true si querés ver las consultas SQL en consola
     
 
   }

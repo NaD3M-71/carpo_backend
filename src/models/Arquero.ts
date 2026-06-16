@@ -168,4 +168,16 @@ export class Arquero extends Model {
     allowNull: false
   })
   declare rol: Rol;
-}
+
+  @Column({
+    type: DataType.STRING,
+    allowNull: true
+  })
+  declare token: string | null;
+
+  @Column({
+    type: DataType.DATE,
+    allowNull: true
+  })
+  declare tokenExpiration: Date | null;
+  }
