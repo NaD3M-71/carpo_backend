@@ -7,6 +7,23 @@ import { generateToken } from '../utils/jwt';
 import { sendResetPasswordMail } from '../utils/sendResetPasswordMail';
 import { AuthRequest } from '../types';
 
+// Campos "de arquería" seguros para mostrar públicamente, sin datos personales
+// (nada de dni, email, telefono, direccion, fechaNacimiento, cuotas, etc.)
+const CAMPOS_PUBLICOS_DETALLE = [
+  'id',
+  'nombre',
+  'apellido',
+  'tipoArco',
+  'lateralidad',
+  'categoriaGeneral',
+  'sexo',
+  'edadCategoria',
+  'bio',
+  'fotoUrl'
+] as const;
+
+const LIMITE_LISTADO = 25;
+
 export class ArqueroController {
   //CREATE
   static registrarArquero =async (req: Request, res: Response) => {
@@ -53,13 +70,35 @@ export class ArqueroController {
   //READ
   static getAll = async (req: Request, res: Response): Promise<void> => {
     try {
-      const arqueros = await Arquero.findAll({
-        attributes: { exclude: ['password'] },
-        order: [['createdAt', 'DESC']]
+      const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+      const search = (req.query.search as string || '').trim();
+
+      const where = search
+        ? {
+            [Op.and]: [
+              { isActive: true },
+              {
+                [Op.or]: [
+                  { nombre: { [Op.like]: `%${search}%` } },
+                  { apellido: { [Op.like]: `%${search}%` } }
+                ]
+              }
+            ]
+          }
+        : { isActive: true };
+
+      const { rows: arqueros, count: total } = await Arquero.findAndCountAll({
+        where,
+        attributes: ['id', 'nombre', 'apellido'],
+        order: [['apellido', 'ASC'], ['nombre', 'ASC']],
+        limit: LIMITE_LISTADO,
+        offset: (page - 1) * LIMITE_LISTADO
       });
 
       res.status(200).json({
-        total: arqueros.length,
+        total,
+        page,
+        totalPages: Math.max(1, Math.ceil(total / LIMITE_LISTADO)),
         arqueros
       });
 
@@ -69,12 +108,44 @@ export class ArqueroController {
     }
   };
 
+  // Vista pública de un arquero: solo datos de arquería y bio, nunca datos
+  // personales. Es la misma para cualquiera que la consulte, esté o no logueado.
   static getById = async (req: Request, res: Response): Promise<void> => {
     try {
       const { id } = req.params;
 
       const arquero = await Arquero.findByPk(id, {
-        attributes: { exclude: ['password'] }
+        attributes: [...CAMPOS_PUBLICOS_DETALLE, 'isActive']
+      });
+
+      if (!arquero || !arquero.isActive) {
+        res.status(404).json({ error: 'Arquero no encontrado' });
+        return;
+      }
+
+      const datosCompletos = arquero.toJSON() as Record<string, unknown>;
+      const arqueroPublico: Record<string, unknown> = {};
+      for (const campo of CAMPOS_PUBLICOS_DETALLE) {
+        arqueroPublico[campo] = datosCompletos[campo];
+      }
+
+      res.status(200).json({ arquero: arqueroPublico });
+
+    } catch (error) {
+      console.error('Error al obtener arquero:', error);
+      res.status(500).json({ error: 'Error al obtener el arquero' });
+    }
+  };
+
+  // Vista completa de un arquero, solo para ADMIN/SUPERADMIN (botón
+  // "Ver información completa" en el frontend). No filtra por isActive:
+  // el admin también necesita ver socios dados de baja.
+  static getByIdCompleto = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const { id } = req.params;
+
+      const arquero = await Arquero.findByPk(id, {
+        attributes: { exclude: ['password', 'token', 'tokenExpiration'] }
       });
 
       if (!arquero) {
@@ -85,7 +156,7 @@ export class ArqueroController {
       res.status(200).json({ arquero });
 
     } catch (error) {
-      console.error('Error al obtener arquero:', error);
+      console.error('Error al obtener el detalle completo del arquero:', error);
       res.status(500).json({ error: 'Error al obtener el arquero' });
     }
   };
@@ -255,10 +326,17 @@ static me = async (req: AuthRequest, res: Response): Promise<void> => {
     res.status(200).json({
       id: arquero.id,
       nombre: arquero.nombre,
+      apellido: arquero.apellido,
       email: arquero.email,
       rol: arquero.rol,
       tipoArco: arquero.tipoArco,
-      sexo: arquero.sexo
+      lateralidad: arquero.lateralidad,
+      categoriaGeneral: arquero.categoriaGeneral,
+      sexo: arquero.sexo,
+      bio: arquero.bio,
+      telefono: arquero.telefono,
+      direccion: arquero.direccion,
+      fechaNacimiento: arquero.fechaNacimiento
     });
 
   } catch (error) {
@@ -266,6 +344,58 @@ static me = async (req: AuthRequest, res: Response): Promise<void> => {
     res.status(500).json({ error: 'Error al obtener usuario' });
   }
 };
+
+  // Actualizar el propio perfil (usuario autenticado)
+  static updateMe = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      if (!req.user) {
+        res.status(401).json({ error: 'No autenticado' });
+        return;
+      }
+
+      const arquero = await Arquero.findByPk(req.user.id);
+
+      if (!arquero) {
+        res.status(404).json({ error: 'Usuario no encontrado' });
+        return;
+      }
+
+      // Solo se permite editar datos personales, de contacto y de perfil de arquero.
+      // email, dni, password, rol, isActive y las cuotas se administran por otras vías.
+      const camposPermitidos = [
+        'nombre',
+        'apellido',
+        'bio',
+        'tipoArco',
+        'lateralidad',
+        'categoriaGeneral',
+        'sexo',
+        'telefono',
+        'direccion',
+        'fechaNacimiento'
+      ] as const;
+
+      const datosActualizados: Partial<Record<typeof camposPermitidos[number], unknown>> = {};
+      for (const campo of camposPermitidos) {
+        if (req.body[campo] !== undefined) {
+          datosActualizados[campo] = req.body[campo];
+        }
+      }
+
+      await arquero.update(datosActualizados);
+
+      const { password: _, token: __, tokenExpiration: ___, ...arqueroSinDatosSensibles } = arquero.toJSON();
+
+      res.status(200).json({
+        message: 'Perfil actualizado exitosamente',
+        arquero: arqueroSinDatosSensibles
+      });
+
+    } catch (error) {
+      console.error('Error al actualizar el perfil:', error);
+      res.status(500).json({ error: 'Error al actualizar el perfil' });
+    }
+  };
 
   // Logout
   static logout = async (_req: Request, res: Response): Promise<void> => {
