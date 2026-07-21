@@ -96,9 +96,13 @@ router.post("/register", // Validaciones
     .optional()
     .isISO8601().withMessage('Fecha de nacimiento no válida'),
 
+  body('bio')
+    .optional({ nullable: true, checkFalsy: true })
+    .isLength({ max: 10000 }).withMessage('La biografía es demasiado larga'),
+
   // Middleware para manejar errores
   handleInputErrors,
-  
+
   // Controller
   ArqueroController.registrarArquero)
 
@@ -116,7 +120,7 @@ router.put('/me',
 
   body('bio')
     .optional({ nullable: true, checkFalsy: true })
-    .isLength({ max: 5000 }).withMessage('La biografía es demasiado larga'),
+    .isLength({ max: 10000 }).withMessage('La biografía es demasiado larga'),
 
   body('tipoArco')
     .optional()

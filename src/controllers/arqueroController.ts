@@ -6,6 +6,7 @@ import { Op } from 'sequelize';
 import { generateToken } from '../utils/jwt';
 import { sendResetPasswordMail } from '../utils/sendResetPasswordMail';
 import { AuthRequest } from '../types';
+import { sanitizeBioHtml } from '../utils/sanitizeBio';
 
 // Campos "de arquería" seguros para mostrar públicamente, sin datos personales
 // (nada de dni, email, telefono, direccion, fechaNacimiento, cuotas, etc.)
@@ -29,6 +30,10 @@ export class ArqueroController {
   static registrarArquero =async (req: Request, res: Response) => {
   try {
     const { password, ...data } = req.body;
+
+    if (data.bio !== undefined) {
+      data.bio = sanitizeBioHtml(data.bio);
+    }
 
     // Verificar si el email ya existe
     const emailExiste = await Arquero.findOne({ where: { email: data.email } });
@@ -198,7 +203,11 @@ export class ArqueroController {
 
     // Preparar datos para actualizar
     const datosActualizados: any = { ...data };
-    
+
+    if (datosActualizados.bio !== undefined) {
+      datosActualizados.bio = sanitizeBioHtml(datosActualizados.bio);
+    }
+
     if (email) datosActualizados.email = email;
     if (dni) datosActualizados.dni = dni;
 
@@ -380,6 +389,10 @@ static me = async (req: AuthRequest, res: Response): Promise<void> => {
         if (req.body[campo] !== undefined) {
           datosActualizados[campo] = req.body[campo];
         }
+      }
+
+      if (datosActualizados.bio !== undefined) {
+        datosActualizados.bio = sanitizeBioHtml(datosActualizados.bio);
       }
 
       await arquero.update(datosActualizados);
