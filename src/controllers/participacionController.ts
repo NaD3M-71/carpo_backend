@@ -7,11 +7,22 @@ import { AuthRequest } from '../types';
 
 export class ParticipacionController {
 
-  // Inscribir arquero a un torneo
+  // Inscribir arquero (o invitado) a un torneo
   static inscribirArquero = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      const { torneoId, arqueroId, categoriaEspecificaId, tipoArco, sexo } = req.body;
-      
+      const {
+        torneoId,
+        arqueroId,
+        categoriaEspecificaId,
+        tipoArco,
+        sexo,
+        esInvitado,
+        invitadoNombre,
+        invitadoApellido
+      } = req.body;
+
+      const invitado = !!esInvitado;
+
       // Validar que el torneo existe
       const torneo = await Torneo.findByPk(torneoId);
       if (!torneo) {
@@ -25,13 +36,6 @@ export class ParticipacionController {
         return;
       }
 
-      // Validar que el arquero existe
-      const arquero = await Arquero.findByPk(arqueroId);
-      if (!arquero) {
-        res.status(404).json({ error: 'Arquero no encontrado' });
-        return;
-      }
-
       // Validar que la categoría existe
       const categoria = await CategoriaModalidad.findByPk(categoriaEspecificaId);
       if (!categoria) {
@@ -41,9 +45,37 @@ export class ParticipacionController {
 
       // Validar que la categoría corresponde a la modalidad del torneo
       if (categoria.modalidad !== torneo.modalidad) {
-        res.status(400).json({ 
-          error: `La categoría no corresponde a la modalidad del torneo (${torneo.modalidad})` 
+        res.status(400).json({
+          error: `La categoría no corresponde a la modalidad del torneo (${torneo.modalidad})`
         });
+        return;
+      }
+
+      // Invitado: no tiene fila en `arqueros`, se guarda el nombre directo en la participación.
+      // No se chequea duplicado: un invitado no tiene identidad estable entre inscripciones.
+      if (invitado) {
+        const participacion = await Participacion.create({
+          arqueroId: null,
+          torneoId,
+          categoriaEspecificaId,
+          esInvitado: true,
+          invitadoNombre,
+          invitadoApellido,
+          tipoArco,
+          sexo
+        });
+
+        res.status(201).json({
+          message: 'Inscripción exitosa',
+          participacion
+        });
+        return;
+      }
+
+      // Validar que el arquero existe
+      const arquero = await Arquero.findByPk(arqueroId);
+      if (!arquero) {
+        res.status(404).json({ error: 'Arquero no encontrado' });
         return;
       }
 
@@ -77,28 +109,14 @@ export class ParticipacionController {
     }
   };
 
-  // Desinscribir arquero de un torneo
+  // Desinscribir una participación (arquero real o invitado) de un torneo
   static desinscribirArquero = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      const { torneoId, arqueroId } = req.params;
+      const { id } = req.params;
 
-      // Validar que el torneo existe
-      const torneo = await Torneo.findByPk(torneoId);
-      if (!torneo) {
-        res.status(404).json({ error: 'Torneo no encontrado' });
-        return;
-      }
+      // TODO: solo pueden desinscribir los admins en caso que de que el arquero no haya asistido
 
-      // No permitir desinscripción si el torneo ya finalizó o está cancelado
-      // if (torneo.estado === EstadoTorneo.CERRADO ) {
-      //   res.status(400).json({ error: 'No se puede desinscribir de un torneo finalizado o cancelado' });
-      //   return;
-      // } TODO: solo pueden desinscribir los admins en caso que de que el arquero no haya asistido
-
-      // Buscar la participación
-      const participacion = await Participacion.findOne({
-        where: { arqueroId, torneoId }
-      });
+      const participacion = await Participacion.findByPk(id);
 
       if (!participacion) {
         res.status(404).json({ error: 'Participación no encontrada' });
@@ -276,11 +294,13 @@ export class ParticipacionController {
       const { anio } = req.params; // Para filtrar por año
 
       // Obtener todas las participaciones de torneos Copa CARPO del año
+      // (los invitados no suman a la Copa anual, quedan afuera de esta tabla)
       const participaciones = await Participacion.findAll({
+        where: { esInvitado: false },
         include: [
           {
             model: Torneo,
-            where: { 
+            where: {
               esCopaCARPO: true,
               anio: parseInt(anio)
             },
@@ -342,7 +362,8 @@ export class ParticipacionController {
       const { sexo } = req.query; // Filtro opcional por query param
 
       // Construir el where dinámico
-      const whereParticipacion: any = { tipoArco };
+      // (los invitados no suman a la Copa anual, quedan afuera de esta tabla)
+      const whereParticipacion: any = { tipoArco, esInvitado: false };
       if (sexo) {
         whereParticipacion.sexo = sexo;
       }
