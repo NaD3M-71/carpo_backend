@@ -30,14 +30,15 @@ export enum Medalla {
 })
 export class Participacion extends Model {
   @ForeignKey(() => Arquero)
+  @AllowNull(true)
   @Column({
     type: DataType.INTEGER,
-    allowNull: false
+    allowNull: true
   })
-  declare arqueroId: number;
+  declare arqueroId: number | null;
 
   @BelongsTo(() => Arquero)
-  declare arquero: Arquero;
+  declare arquero: Arquero | null;
 
   @ForeignKey(() => Torneo)
   @Column({
@@ -70,6 +71,27 @@ export class Participacion extends Model {
     allowNull: false
   })
   declare sexo: Sexo;
+
+  // Arqueros invitados (no son socios, no tienen fila en `arqueros`):
+  // se guardan directo acá para no duplicar arqueros externos entre torneos.
+  @Default(false)
+  @Column({
+    type: DataType.BOOLEAN,
+    allowNull: false
+  })
+  declare esInvitado: boolean;
+
+  @AllowNull(true)
+  @Column({
+    type: DataType.STRING(100)
+  })
+  declare invitadoNombre: string | null;
+
+  @AllowNull(true)
+  @Column({
+    type: DataType.STRING(100)
+  })
+  declare invitadoApellido: string | null;
 
   // Datos de clasificación
   @AllowNull(true)

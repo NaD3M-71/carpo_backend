@@ -51,25 +51,60 @@ router.get('/tabla-categoria/:anio/:tipoArco',
 
 // ==================== RUTAS PROTEGIDAS (USUARIO LOGUEADO) ====================
 
-// Inscribir arquero a un torneo
+// Inscribir arquero (o invitado) a un torneo
 router.post('/',
   authenticate,
   body('torneoId')
     .notEmpty().withMessage('El ID del torneo es obligatorio')
     .isInt().withMessage('ID de torneo no válido'),
-  
-  body('arqueroId')
-    .notEmpty().withMessage('El ID del arquero es obligatorio')
-    .isInt().withMessage('ID de arquero no válido'),
-  
+
   body('categoriaEspecificaId')
     .notEmpty().withMessage('La categoría específica es obligatoria')
     .isInt().withMessage('ID de categoría no válido'),
-  
+
+  body('esInvitado')
+    .optional()
+    .isBoolean().withMessage('esInvitado debe ser un booleano'),
+
+  body('arqueroId')
+    .custom((value, { req }) => {
+      const esInvitado = req.body.esInvitado === true || req.body.esInvitado === 'true';
+      if (esInvitado && value) {
+        throw new Error('Un invitado no debe tener arqueroId');
+      }
+      if (!esInvitado && !value) {
+        throw new Error('El ID del arquero es obligatorio');
+      }
+      return true;
+    })
+    .bail()
+    .if((value) => value !== undefined && value !== null && value !== '')
+    .isInt().withMessage('ID de arquero no válido'),
+
+  body('invitadoNombre')
+    .if((value, { req }) => req.body.esInvitado === true || req.body.esInvitado === 'true')
+    .notEmpty().withMessage('El nombre del invitado es obligatorio')
+    .isString()
+    .isLength({ max: 100 }).withMessage('El nombre del invitado es demasiado largo'),
+
+  body('invitadoApellido')
+    .if((value, { req }) => req.body.esInvitado === true || req.body.esInvitado === 'true')
+    .notEmpty().withMessage('El apellido del invitado es obligatorio')
+    .isString()
+    .isLength({ max: 100 }).withMessage('El apellido del invitado es demasiado largo'),
+
+  body('tipoArco')
+    .if((value, { req }) => req.body.esInvitado === true || req.body.esInvitado === 'true')
+    .notEmpty().withMessage('El tipo de arco es obligatorio para invitados'),
+
   body('tipoArco')
     .optional()
     .isString().withMessage('Tipo de arco no válido'),
-  
+
+  body('sexo')
+    .if((value, { req }) => req.body.esInvitado === true || req.body.esInvitado === 'true')
+    .notEmpty().withMessage('El sexo es obligatorio para invitados'),
+
   body('sexo')
     .optional()
     .isString().withMessage('Sexo no válido'),
@@ -78,11 +113,10 @@ router.post('/',
   ParticipacionController.inscribirArquero
 );
 
-// Desinscribir arquero de un torneo
-router.delete('/:torneoId/:arqueroId',
+// Desinscribir una participación (arquero o invitado) de un torneo
+router.delete('/:id',
   authenticate,
-  param('torneoId').isInt().withMessage('ID de torneo no válido'),
-  param('arqueroId').isInt().withMessage('ID de arquero no válido'),
+  param('id').isInt().withMessage('ID de participación no válido'),
   handleInputErrors,
   ParticipacionController.desinscribirArquero
 );
